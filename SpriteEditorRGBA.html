@@ -1,8 +1,6 @@
 <head>
 <title>bitluni's Sprite Editor</title>
 <script>
-window.AudioContext = window.AudioContext || window.webkitAudioContext;
-var context = new AudioContext();
 
 var project = {
 	name: "sprites",
@@ -171,17 +169,47 @@ function addFiles(event)
 	for(var i = 0; i < event.target.files.length; i++)
 	{
 		var file = event.target.files[i];
-		addFile(file, file.name.replace(/[^A-Z0-9]/ig, "_") + Math.floor(Math.random() * 1000000))
+		addFile(file, "f" + file.name.replace(/[^A-Z0-9]/ig, "_") + Math.floor(Math.random() * 1000000))
 	}
 	event.target.value = "";
 }
 
-function spritesToHeader()
+function spritesToHeader(pixelformat)
 {
 	var name = project.name;
 	var sprites = project.sprites;
 	var offsets = [0];
 	var pointOffsets = [0];
+	var rf, rshift, gf, gshift, bf, bshift, af, ashift, type;
+	switch(pixelformat)
+	{
+		case "R4G4B4A4":
+		{
+			rf = gf = bf = af = 15.;
+			rshift = 0;
+			gshift = 4;
+			bshift = 8;
+			ashift = 12;
+			type = "unsigned short";
+			break;
+		}
+		case "R5G5B4A2":
+		{
+			rf = gf = 31.;
+			bf = 15.;
+			af = 3.;
+			rshift = 0;
+			gshift = 5;
+			bshift = 10;
+			ashift = 14;
+			type = "unsigned short";
+			break;
+		}
+		default:
+			alert("Unsupported pixel format " + pixelformat);
+			return;
+	}
+
 	for(var i = 0; i < sprites.length; i++)
 	{
 		offsets.push(offsets[i] + sprites[i].source.length / 4);
@@ -196,7 +224,7 @@ function spritesToHeader()
 		text += pointOffsets[i] + ", ";
 	text += "};\r\n";
 	
-	text += "const unsigned short " + name + "Res[][2] = {"
+	text += "const " + type + " " + name + "Res[][2] = {"
 	for(var i = 0; i < sprites.length; i++)
 	{
 		text += "{" + sprites[i].xres + ", " + sprites[i].yres + "}, ";
@@ -220,7 +248,8 @@ function spritesToHeader()
 			var g = s[j + 1];
 			var b = s[j + 2];
 			var a = s[j + 3];
-			var c = Math.round(r / 255. * 15.) + (Math.round(g / 255. * 15.) << 4) + (Math.round(b / 255. * 15.) << 8) + (Math.round(a / 255. * 15.) << 12)
+			var c = 0;
+			c = (Math.round(r / 255. * rf) << rshift) + (Math.round(g / 255. * gf) << gshift) + (Math.round(b / 255. * bf) << bshift) + (Math.round(a / 255. * af) << ashift);
 			text += c + ", ";
 		}
 	}
@@ -399,7 +428,9 @@ function saveHeader()
 	meta.className = file.className = "block file";
 	file.download = file.innerHTML = project.name + ".h";
 	meta.download = meta.innerHTML = project.name + ".txt";
-	file.href = URL.createObjectURL(new Blob([spritesToHeader()], {type: "text/plain"}));
+	var e = document.getElementById("pixelformat");
+	var pixelformat = e.options[e.selectedIndex].value;
+	file.href = URL.createObjectURL(new Blob([spritesToHeader(pixelformat)], {type: "text/plain"}));
 	meta.href = URL.createObjectURL(new Blob([getMeta()], {type: "text/plain"}));
 	fileArea.appendChild(file);
 	fileArea.appendChild(meta);
@@ -407,7 +438,7 @@ function saveHeader()
 }
 
 function update()
-{	
+{
 	for(var i = 0; i < project.sprites.length; i++)
 		if(!project.sprites[i].canvas)
 			return;
@@ -542,13 +573,17 @@ function update()
 		<span class="block spritefiles">
 			<button title="Add image files" onclick="document.getElementById('addimages').click()">&#127750;</button>
 			<input id="addimages" type="file" onchange="addFiles(event)" accept="image/*" multiple hidden>
-			<button title="Export sprite header" onclick="saveHeader();" style="font-size: 15px; font-weight:bold">.h</button>
+            <button title="Export sprite header" onclick="saveHeader();" style="font-size: 15px; font-weight:bold">.h</button>
+            <select id="pixelformat" title="Export pixel format">
+				<option vlaue="R4G4B4A4">R4G4B4A4</option>
+				<option vlaue="R5G5B4A2">R5G5B4A2</option>
+			</select>
+			<input id="template" type="input" placeholder="template" style="width: 60px">
 		</span>
 		<span class="block options">
 			<span class="option">name <input id="name" type="text" value="sprites" style="width: 80px" onchange="update()"></span>
 			<span class="option">&#128270;<input id="zoom" type="number" value="4" style="width: 50px" onchange="update()"></span>
-			<span class="option"><button title="Crop sprites" onclick="crop();">&#8983;</button></span>
-				
+			<span class="option"><button title="Crop sprites" onclick="crop();">&#8983;</button></span>		
 		</span>
 	</div>
 	<div class="hidden" id="files">
